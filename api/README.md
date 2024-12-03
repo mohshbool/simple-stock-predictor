@@ -2,7 +2,7 @@
 
 Simple stock price prediction model using LSTM neural networks.
 
-## Setup Instructions
+## Setup Instructions (/api)
 
 1. Create a virtual environment:
    ```bash
