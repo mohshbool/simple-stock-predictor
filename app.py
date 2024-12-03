@@ -1,13 +1,17 @@
-from http.server import BaseHTTPRequestHandler
-from datetime import datetime, timedelta
-import json
+# app.py
+from flask import Flask, render_template, request, jsonify
+import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, LSTM
 import yfinance as yf
+from datetime import datetime, timedelta
+
+app = Flask(__name__)
 
 def create_stock_prediction_model(ticker, start_date, prediction_days):
+    """Creates and trains the LSTM model"""
     df = yf.download(ticker, start=start_date, progress=False)
     
     if df.empty:
@@ -43,6 +47,7 @@ def create_stock_prediction_model(ticker, start_date, prediction_days):
     return model, scaler, df
 
 def predict_next_days(model, scaler, data, prediction_days, days_to_predict):
+    """Predicts future stock prices"""
     predictions = []
     current_batch = data[-prediction_days:].reshape(-1, 1)
     current_batch = scaler.transform(current_batch)
@@ -56,34 +61,36 @@ def predict_next_days(model, scaler, data, prediction_days, days_to_predict):
     
     return predictions
 
-def handle_request(request):
+@app.route('/')
+def home():
+    return render_template('index.html')
+
+@app.route('/predict', methods=['POST'])
+def predict():
     try:
-        body = json.loads(request.get('body', '{}'))
-        ticker = body['ticker'].upper()
-        start_date = body['startDate']
-        prediction_days = int(body['predictionDays'])
-        days_to_predict = int(body['daysToPredict'])
+        data = request.json
+        ticker = data['ticker'].upper()
+        start_date = data['startDate']
+        prediction_days = int(data['predictionDays'])
+        days_to_predict = int(data['daysToPredict'])
         
+        # Validate inputs
         if prediction_days < 1 or days_to_predict < 1:
-            return {
-                'statusCode': 400,
-                'body': json.dumps({'error': 'Prediction days must be positive numbers'})
-            }
+            return jsonify({'error': 'Prediction days must be positive numbers'}), 400
             
         try:
             datetime.strptime(start_date, '%Y-%m-%d')
         except ValueError:
-            return {
-                'statusCode': 400,
-                'body': json.dumps({'error': 'Invalid date format'})
-            }
+            return jsonify({'error': 'Invalid date format'}), 400
         
+        # Create and train model
         model, scaler, stock_data = create_stock_prediction_model(
             ticker, 
             start_date, 
             prediction_days
         )
         
+        # Make predictions
         predictions = predict_next_days(
             model, 
             scaler, 
@@ -92,33 +99,25 @@ def handle_request(request):
             days_to_predict
         )
         
+        # Generate future dates
         last_date = stock_data.index[-1]
         future_dates = []
         for i in range(days_to_predict):
             future_dates.append((last_date + timedelta(days=i+1)).strftime('%Y-%m-%d'))
         
+        # Format response
         response = {
             'currentPrice': float(stock_data['Close'].iloc[-1]),
             'predictions': [float(price) for price in predictions],
             'dates': future_dates
         }
         
-        return {
-            'statusCode': 200,
-            'body': json.dumps(response)
-        }
+        return jsonify(response)
         
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
-        return {
-            'statusCode': 500,
-            'body': json.dumps({'error': str(e)})
-        }
+        return jsonify({'error': 'An error occurred during prediction'}), 500
 
-def handler(request):
-    if request.get('method') == 'POST':
-        return handle_request(request)
-    else:
-        return {
-            'statusCode': 405,
-            'body': json.dumps({'error': 'Method not allowed'})
-        }
+if __name__ == '__main__':
+    app.run(debug=True)

@@ -2,7 +2,9 @@
 
 Simple stock price prediction model using LSTM neural networks.
 
-## Setup Instructions (/api)
+![Stock Price Prediction Preview](https://github.com/mohshbool/simple-stock-predictor/blob/main/preview.png)
+
+## Setup Instructions
 
 1. Create a virtual environment:
    ```bash
@@ -18,14 +20,9 @@ Simple stock price prediction model using LSTM neural networks.
    pip install -r requirements.txt
    ```
 
-4. Create .env file:
-   ```bash
-   cp .env.demo .env
-   ```
-
 5. Run the prediction:
    ```bash
-   python __init__.py
+   python app.py
    ```
 
 ## Configuration
